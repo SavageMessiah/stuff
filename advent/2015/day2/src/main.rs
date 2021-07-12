@@ -47,7 +47,7 @@ fn package_needed() {
 
 fn parse_package(line: &str) -> Result<Package> {
     let dims : Vec<u32> = line.split("x")
-                              .map(|d| d.parse::<u32>())
+                              .map(str::parse::<u32>)
                               .collect::<Result<_, _>>()?;
     if dims.len() != 3 {
         return Err(anyhow!("Expected 3 dimensions, got {}", dims.len()))
