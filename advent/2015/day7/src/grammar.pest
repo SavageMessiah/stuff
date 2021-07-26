@@ -1,0 +1,9 @@
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+wire = @{ ASCII_ALPHA+ }
+num = @{ ASCII_DIGIT+ }
+input = { wire | num }
+op = {"AND" | "OR" | "LSHIFT" | "RSHIFT"}
+binop = { input ~ op ~ input }
+not = { "NOT" ~ input }
+connection = { (not | binop | input) ~ "->" ~ wire }
+connections = { connection+ }
