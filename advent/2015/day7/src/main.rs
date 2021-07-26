@@ -4,7 +4,6 @@ use pest::{
     iterators::Pair};
 use pest_derive::Parser;
 use std::collections::{BTreeMap, HashSet};
-use std::fmt;
 
 type Wire = String;
 type Signal = u16;
@@ -13,15 +12,6 @@ type Signal = u16;
 enum Input {
     Constant(Signal),
     Connection(Wire)
-}
-
-impl fmt::Display for Input {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Input::Constant(n) => write!(f, "{}", n),
-            Input::Connection(w) => write!(f, "{}", w),
-        }
-    }
 }
 
 impl Input {
@@ -40,12 +30,9 @@ struct Component {
 }
 
 impl Component {
-    fn run(self: &Component, sigs: &mut BTreeMap<Wire, Signal>) {
-        //let strs = self.ins.iter().map(|i| i.to_string()).collect::<Vec<String>>();
-        //println!("{} -> {}", strs.join(", "), self.out);
+    fn run(&self, sigs: &mut BTreeMap<Wire, Signal>) {
         let ins = self.ins.iter().map(|i| i.get(sigs)).collect::<Option<Vec<u16>>>();
         if let Some(ins) = ins {
-            //this clone is dumb
             sigs.insert(self.out.clone(), (self.op)(&ins));
         }
     }
@@ -148,10 +135,23 @@ fn run_circuit(comps: &Vec<Component>) -> BTreeMap<Wire, Signal> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let components = parse_components(include_str!("input.txt"))?;
-    println!("len: {}", components.len());
-    let signals = run_circuit(&components);
+    let mut components = parse_components(include_str!("input.txt"))?;
+    println!("{} components", components.len());
 
+    let signals = run_circuit(&components);
+    println!("a is {}", signals["a"]);
+
+    println!("patching circuit");
+    for comp in &mut components {
+        match (&comp.ins[..], comp.out.as_str()) {
+            ([Input::Constant(_)], "b") => {
+                comp.ins[0] = Input::Constant(signals["a"]);
+            },
+            _ => ()
+        }
+    }
+
+    let signals = run_circuit(&components);
     println!("a is {}", signals["a"]);
 
     Ok(())
