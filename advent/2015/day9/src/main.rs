@@ -31,7 +31,9 @@ fn main() {
         collect::<Option<Vec<_>>>().unwrap();
 
     let shortest = paths.iter().min_by_key(|(_, dist)| dist).unwrap();
+    let longest = paths.iter().max_by_key(|(_, dist)| dist).unwrap();
 
     println!("{} paths", paths.len());
     println!("shortest: {:?} of distance {}", shortest.0, shortest.1);
+    println!("longest: {:?} of distance {}", longest.0, longest.1);
 }
