@@ -24,7 +24,7 @@ fn main() {
     let res = unfold(vec![3, 1, 1, 3, 3, 2, 2, 1, 1, 3], |v| {
         *v = look_and_say(&v);
         Some(v.clone())
-    }).take(40).last().unwrap();
+    }).take(50).last().unwrap();
 
     println!("len = {}", res.len());
 }
