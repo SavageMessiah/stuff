@@ -1,10 +1,18 @@
 use itertools::Itertools;
 use std::iter::successors;
 
+fn ascii_to_n(d: char) -> u64 {
+    (d as u8 - 97) as u64
+}
+
+fn n_to_ascii(n: u64) -> char {
+    (n as u8 + 97) as char
+}
+
 fn parse(s: &str) -> u64 {
     let mut n = 0;
-    for (i, c) in s.bytes().rev().enumerate() {
-        n += 26u64.pow(i as u32) * (c as u64 - 97);
+    for (i, c) in s.chars().rev().enumerate() {
+        n += 26u64.pow(i as u32) * ascii_to_n(c);
     }
     n
 }
@@ -23,7 +31,7 @@ fn unparse(n: u64) -> String {
         let rem = n % 26;
         n = n / 26;
 
-        s.push((rem as u8 + 97) as char)
+        s.push(n_to_ascii(rem))
     }
 
     s.iter().rev().collect::<String>()
@@ -57,10 +65,10 @@ fn separate_pairs(s: &str) -> bool {
 }
 
 fn increasing_straight(s: &str) -> bool {
-    s.bytes().tuple_windows().find(|(a, b, c)| {
-        let a = a - 97 + 2;
-        let b = b - 97 + 1;
-        let c = c - 97;
+    s.chars().tuple_windows().find(|(a, b, c)| {
+        let a = ascii_to_n(*a) + 2;
+        let b = ascii_to_n(*b) + 1;
+        let c = ascii_to_n(*c);
         a == b && b == c
     }).is_some()
 }
@@ -76,8 +84,7 @@ fn valid(s: &str) -> bool {
 
 fn main() {
     let next = successors(Some("cqjxjnds".to_string()), |s| Some(inc(s))).
-        find(|s| valid(s)).unwrap();
-
+        filter(|s| valid(s)).nth(1).unwrap();
 
     println!("{}", next);
 }
