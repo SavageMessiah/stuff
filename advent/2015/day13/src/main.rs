@@ -39,15 +39,20 @@ fn happiness<'a>(rules: &HashMap<(&'a str, &'a str), i32>, peeps: &[&'a str]) ->
 
 fn main() -> Result<()> {
     let rules = include_str!("input.txt").lines().map(parse_line).collect::<Result<Vec<_>>>()?;
-    let people = rules.iter().flat_map(|r| vec![r.target, r.other]).collect::<HashSet<_>>();
+
+    let mut people = rules.iter().flat_map(|r| vec![r.target, r.other]).collect::<HashSet<_>>();
+
     let mut combined = HashMap::new();
     for Rule {target, amount, other} in &rules {
         combined.insert((*target, *other), *amount);
     }
 
-    println!("perms: {}", people.iter().permutations(people.len()).count());
-    println!("people: {:?}", people);
-    println!("one: {:?}", people.iter().copied().cycle().tuple_windows::<(&str, &str)>().take(people.len()).collect::<Vec<_>>());
+    let me = "me";
+    for person in &people {
+        combined.insert((me, person), 0);
+        combined.insert((person, me), 0);
+    }
+    people.insert(me);
 
     let solution = people.iter().copied().permutations(people.len()).map(move |p| {
         let happiness = happiness(&combined, &p);
