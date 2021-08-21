@@ -88,6 +88,10 @@ fn score(picks: &[(&Ingredient, i32)]) -> i32 {
     totals.capacity * totals.durability * totals.flavor * totals.texture
 }
 
+fn calories(picks: &[(&Ingredient, i32)]) -> i32 {
+    picks.iter().map(|(i, a)| i.calories * a).sum()
+}
+
 #[test]
 fn test_score() {
     let ingredients = "Butterscotch: capacity -1, durability -2, flavor 6, texture 3, calories 8
@@ -104,11 +108,19 @@ fn main() -> Result<()>{
     let mut best: Option<(Vec<(&Ingredient, i32)>, i32)> = None;
 
     combinations(&ingredients, |ins| {
+        if calories(&ins) != 500 {
+            return
+        }
         let score = score(&ins);
-        match best {
-            None => { best = Some((ins, score)) },
-            Some((_, prev)) if prev < score => { best = Some((ins, score)) },
-            _ => {},
+
+        let better = match best {
+            None => true,
+            Some((_, prev)) if prev < score => true,
+            _ => false
+        };
+
+        if better {
+             best = Some((ins, score));
         }
     });
 
