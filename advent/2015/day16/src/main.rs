@@ -16,6 +16,15 @@ fn parse_line(s: &str) -> Result<HashMap<String, i32>> {
     Ok(props)
 }
 
+fn prop_check(target: &HashMap<String, i32>, prop: &str, amt: i32) -> bool {
+    let val = target[prop];
+    match prop {
+        "cats" | "trees" => val < amt,
+        "pomeranians" | "goldfish" => val > amt,
+        _ => val == amt
+    }
+}
+
 fn main() -> Result<()> {
     let aunts = include_str!("input.txt").lines().map(parse_line).collect::<Result<Vec<HashMap<String, i32>>>>()?;
     let target: HashMap<String, i32> = HashMap::from_iter([
@@ -31,14 +40,13 @@ fn main() -> Result<()> {
         ("perfumes".to_string(), 1),
     ]);
 
-    let sol = aunts.iter().enumerate().find(|(n, aunt)| {
+    let sol = aunts.iter().enumerate().filter(|(_, aunt)| {
         aunt.iter().all(|(prop, &amt)| {
-            println!("target {:?}, checking {} {:?}", target, n, aunt);
-            target[prop] == amt
+            prop_check(&target, prop, amt)
         })
     });
 
-    if let Some((n, aunt)) = sol {
+    for (n, aunt) in sol {
         println!("Aunt {}: {:?}", n + 1, aunt);
     }
 
