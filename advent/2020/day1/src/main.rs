@@ -4,9 +4,9 @@ fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let rows = input.lines().map(|l| l.parse::<u16>()).collect::<Result<Vec<_>, _>>()?;
 
-    let [a1, a2] = rows.into_iter().combinations(2).find(|n| (n[0] + n[1]) == 2020 ).expect("no match")[..] else { unreachable!() };
+    let answer = rows.into_iter().combinations(3).find(|n| n.iter().sum::<u16>() == 2020 ).expect("no match");
 
-    println!("answer {} * {} = {}", a1, a2, u32::from(a1) * u32::from(a2));
+    println!("answer {:?} {}", answer, answer.iter().map(Clone::clone).map(u32::from).product::<u32>());
 
     Ok(())
 }
