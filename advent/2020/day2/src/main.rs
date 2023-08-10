@@ -6,6 +6,7 @@ lazy_static! {
     static ref ROW: Regex = Regex::new(r"(\d+)-(\d+) ([a-z]): (.*)").expect("bad regex");
 }
 
+#[derive(Debug)]
 struct Entry {
     lower: usize,
     upper: usize,
@@ -25,8 +26,10 @@ fn parse(row: &str) -> Result<Entry> {
 }
 
 fn valid(e: &Entry) -> bool {
-    let count = e.pw.chars().filter(|c| *c == e.letter).count();
-    count >= e.lower && count <= e.upper
+    match (e.pw.chars().nth(e.lower - 1), e.pw.chars().nth(e.upper - 1)) {
+        (Some(a), Some(b)) if (a == e.letter) ^ (b == e.letter) => true,
+        _ => false
+    }
 }
 
 fn main() -> anyhow::Result<()> {
