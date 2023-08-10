@@ -10,19 +10,17 @@ impl Map {
         }
     }
 
-    fn count_trees(&self, x: usize, _y: usize) -> usize {
+    fn count_trees(&self, x: usize, y: usize) -> usize {
         let mut trees = 0;
         let mut xpos: usize = 0;
-        let mut ypos: usize = 0;
-        for row in self.trees.iter() {
+        for row in self.trees.iter().step_by(y) {
             let shift = 31 - xpos;
-            println!("r: {:#034b} x: {} y: {}\nm: {:#034b} shift: {} match: {}\n", row, xpos, ypos, 1 << shift, shift, row & (1 << shift));
+            //println!("r: {:#034b} x: {} y: {}\nm: {:#034b} shift: {} match: {}\n", row, xpos, ypos, 1 << shift, shift, row & (1 << shift));
             if (row & (1 << shift)) != 0 {
                 trees += 1;
             }
 
             xpos = (xpos + x) % 31; //each row is actually 31 wide, not 32
-            ypos = 0;
         }
 
         trees
@@ -47,9 +45,16 @@ fn main() -> anyhow::Result<()> {
     for line in input.lines() {
         map.add_row(line);
     }
-    let tree_count = map.count_trees(3, 1);
+    let slopes: Vec<(usize, usize)> = vec![
+        (1, 1),
+        (3, 1),
+        (5, 1),
+        (7, 1),
+        (1, 2),
+    ];
+    let answer = slopes.into_iter().map(|(x, y)| map.count_trees(x, y)).product::<usize>();
 
-    println!("tree count {}", tree_count);
+    println!("answer {}", answer);
 
     Ok(())
 }
