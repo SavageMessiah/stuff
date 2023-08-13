@@ -1,3 +1,6 @@
+use std::collections::HashSet;
+use itertools::Itertools;
+
 fn parse(s: &str) -> u32 {
     let mut row: u32 = 0;
     let mut col: u32 = 0;
@@ -26,7 +29,13 @@ fn test_parse() {
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
-    let answer = input.lines().map(parse).max().unwrap();
+    let seats = input.lines().map(parse).collect::<HashSet<_>>();
+    let answer = (0..128).
+        into_iter().
+        cartesian_product(0..8)
+        .map(|(r, c)| r * 8 + c)
+        .find(|seat| !seats.contains(seat) && seats.contains(&(seat + 1)) && seats.contains(&(seat - 1)))
+        .expect("no answer");
 
     println!("answer {}", answer);
 
