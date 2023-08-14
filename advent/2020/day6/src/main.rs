@@ -2,7 +2,8 @@ use std::collections::HashSet;
 use itertools::Itertools;
 
 fn parse_group(s: &str) -> HashSet<char> {
-    s.chars().filter(|c| *c != '\n').collect()
+    let count = s.lines().count();
+    s.chars().filter(|c| *c != '\n').counts().iter().filter(|e| *e.1 == count).map(|e| *e.0).collect()
 }
 
 fn main() -> anyhow::Result<()> {
