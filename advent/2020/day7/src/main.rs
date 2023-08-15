@@ -28,19 +28,21 @@ fn parse_rule<'a>(s: &'a str) -> Result<(&'a str, HashMap<&'a str, usize>)> {
     Ok((name, content))
 }
 
-fn contains_bag(start: &str, find: &str, rules: &Rules) -> bool {
+fn bag_count(start: &str, rules: &Rules) -> usize {
     let contents = rules.get(start).unwrap(); //assuming references are all valid
-    if contents.contains_key(find) {
-        return true;
-    }
+    println!("bag: {} contents: {:?}", start, contents);
 
-    contents.keys().any(|b| contains_bag(b, find, rules))
+    let direct: usize = contents.values().sum();
+
+    let total = direct + contents.iter().map(|(b, c)| bag_count(b, rules) * c).sum::<usize>();
+    println!("bag: {} direct: {} total: {}", start, direct, total);
+    total
 }
 
 fn main() -> Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let rules = input.lines().map(parse_rule).collect::<Result<Rules>>()?;
-    let answer = rules.keys().filter(|b| contains_bag(b, "shiny gold", &rules)).count();
+    let answer = bag_count("shiny gold", &rules);
 
     println!("answer {}", answer);
 
