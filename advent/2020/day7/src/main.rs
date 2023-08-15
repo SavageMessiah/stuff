@@ -1,0 +1,48 @@
+use std::collections::HashMap;
+use anyhow::{Result, anyhow};
+use lazy_static::lazy_static;
+use regex::Regex;
+
+type Rules<'a> = HashMap<&'a str, HashMap<&'a str, usize>>;
+
+lazy_static! {
+    static ref COUNT: Regex = Regex::new(r"(\d+) (\w+ \w+)").expect("bad regex");
+}
+
+fn parse_rule<'a>(s: &'a str) -> Result<(&'a str, HashMap<&'a str, usize>)> {
+    let (name, contents) = s.split_once(" bags contain ").ok_or(anyhow!("wat {}", s))?;
+
+    if contents == "no other bags." {
+        return Ok((name, HashMap::new()))
+    }
+
+    let mut content = HashMap::new();
+
+    for s in contents.split(", ") {
+        let caps = COUNT.captures(s).ok_or(anyhow!("wat {}", s))?;
+        let n = caps.get(1).unwrap().as_str().parse::<usize>()?;
+        content.insert(caps.get(2).unwrap().as_str(), n);
+    }
+
+
+    Ok((name, content))
+}
+
+fn contains_bag(start: &str, find: &str, rules: &Rules) -> bool {
+    let contents = rules.get(start).unwrap(); //assuming references are all valid
+    if contents.contains_key(find) {
+        return true;
+    }
+
+    contents.keys().any(|b| contains_bag(b, find, rules))
+}
+
+fn main() -> Result<()> {
+    let input = std::fs::read_to_string("input.txt")?;
+    let rules = input.lines().map(parse_rule).collect::<Result<Rules>>()?;
+    let answer = rules.keys().filter(|b| contains_bag(b, "shiny gold", &rules)).count();
+
+    println!("answer {}", answer);
+
+    Ok(())
+}
