@@ -1,8 +1,22 @@
-use std::fmt::Display;
+use std::{fmt::Display, iter::successors};
 
 use anyhow::Result;
 use itertools::Itertools;
 
+type Coord = (usize, usize);
+type Diff = (isize, isize);
+
+fn shift(this: Coord, d: Diff, bounds: Coord) -> Option<Coord> {
+    if (this.0 == 0 && d.0 == -1) || (this.0 == bounds.0 - 1 && d.0 == 1) ||
+        (this.1 == 0 && d.1 == -1) || (this.1 == bounds.1 - 1 && d.1 == 1) {
+            return None;
+        }
+    Some(((this.0 as isize + d.0) as usize, (this.1 as isize + d.1) as usize))
+}
+
+fn line(this: Coord, d: Diff, bounds: Coord) -> impl Iterator<Item = Coord> {
+    successors(Some(this), move |c| shift(*c, d, bounds)).skip(1)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tile {
@@ -56,8 +70,23 @@ impl Grid {
         }
     }
 
-    fn dims(&self) -> (usize, usize) {
+    fn dims(&self) -> Coord {
         (self.width, self.tiles.len() / self.width)
+    }
+
+    fn get(&self, c: Coord) -> &Tile {
+        let dims = self.dims();
+        let i = c.0 + c.1 * dims.0;
+        &self.tiles[i]
+    }
+
+    fn seen_seats(&self, i: usize) -> impl Iterator<Item = &Tile> {
+        let dims = self.dims();
+        let pos = (i % self.width, i / self.width);
+        DIRS.iter().copied().cartesian_product(DIRS.iter().copied()).filter(|d| *d != (0, 0)).filter_map(move |d| {
+            //println!("pos: {:?}, d: {:?}, l: {}", pos, d, line(pos, d, dims).count());
+            line(pos, d, dims).find(|c| *self.get(*c) != Tile::Floor)
+        }).map(move |c| self.get(c))
     }
 
     fn neighbors(&self, i: usize) -> impl Iterator<Item = &Tile> {
@@ -88,11 +117,11 @@ impl Grid {
                 continue;
             }
 
-            let occupied = self.neighbors(i).filter(|n| **n == Tile::Occupied).count();
-            //println!("n: {} occupied: {}", self.neighbors(i).count(), occupied);
+            let occupied = self.seen_seats(i).filter(|n| **n == Tile::Occupied).count();
+            //println!("n: {} occupied: {}", self.seen_seats(i).count(), occupied);
             *t = match occupied {
                 0 => Tile::Occupied,
-                n if n >= 4 => Tile::Empty,
+                n if n >= 5 => Tile::Empty,
                 _ => cur
             }
         }
@@ -121,11 +150,25 @@ fn test_run() {
     println!("{}", start);
     let end = start.run();
     let occupied = end.tiles.iter().filter(|t| **t == Tile::Occupied).count();
-    assert_eq!(occupied, 37);
+    assert_eq!(occupied, 26);
+}
+
+#[test]
+fn test_corner() {
+    let mut it = line((7,7), (1,1), (8, 8));
+    assert_eq!(it.next(), None);
 }
 
 fn main() -> Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
+
+    //let dims = (8, 8);
+    //let pos = (4, 4);
+    //for d in DIRS.iter().copied().cartesian_product(DIRS.iter().copied()).filter(|d| *d != (0, 0)) {
+    //    println!("pos: {:?} d: {:?}", pos, d);
+    //    println!("{:?}", line(pos, d, dims).collect::<Vec<_>>());
+
+    //}
     let start = Grid::parse(&input);
     let end = start.run();
     let answer = end.tiles.iter().filter(|t| **t == Tile::Occupied).count();
