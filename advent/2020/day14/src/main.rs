@@ -9,38 +9,74 @@ lazy_static! {
     static ref SET: Regex = Regex::new(r"mem\[(\d+)\] = (\d+)").unwrap();
 }
 
+struct Mask {
+    or: u64,
+    floating: Vec<u64>
+}
+
+impl Mask {
+    fn expand_address(&self, addr: u64) -> Vec<u64> {
+        println!("starting addr: {:#038b} {}", addr, addr);
+        let mut addrs = vec![addr | self.or];
+
+        for bit in &self.floating {
+            println!("setting floating bit: {:#038b}", bit);
+            let mut more_addrs = addrs.clone();
+            for addr in addrs.iter_mut() {
+                *addr |= *bit;
+            }
+            let bit = (!*bit) & 0xFFFFFFFFF;
+            for addr in more_addrs.iter_mut() {
+                *addr &= bit;
+            }
+            addrs.extend(more_addrs);
+        }
+        for a in &addrs {
+            println!("expanded: {:#038b} {}", a, a);
+        }
+        addrs
+    }
+}
+
+impl From<&[Option<bool>; 36]> for Mask {
+    fn from(source: &[Option<bool>; 36]) -> Self {
+        Mask {
+            or: source.iter().map(|b| b.unwrap_or(false) as u64).fold(0, |acc, b| (acc << 1) | b),
+            floating: source.iter().enumerate().filter_map(|(i, b)| match b {
+                Some(_) => None,
+                None => Some(1 << (35 - i))
+            }).collect()
+        }
+    }
+}
+
 struct State {
-    and_mask: u64,
-    or_mask: u64,
-    mem: HashMap<usize, u64>
+    mask: Mask,
+    mem: HashMap<u64, u64>
 }
 
 impl State {
     fn new() -> State {
         State {
-            and_mask: 0,
-            or_mask: 0,
+            mask: Mask { or: 0, floating: vec![] },
             mem: HashMap::new()
         }
     }
 
     fn run(&mut self, prog: &[Instr]) {
         for instr in prog {
-            println!("instr: {:?}, and: {:#038b} or: {:#038b}", instr, self.and_mask, self.or_mask);
             match instr {
-                Instr::Mask(bits) => {
-                    self.and_mask = bits.iter().map(|b| b.unwrap_or(true) as u64).fold(0, |acc, b| (acc << 1) | b);
-                    self.or_mask = bits.iter().map(|b| b.unwrap_or(false) as u64).fold(0, |acc, b| (acc << 1) | b);
+                Instr::Mask(mask) => {
+                    self.mask = mask.into();
                 },
-                Instr::Mem(loc, val) => {
-                    println!("{:#038b} {}", val, val);
-                    let val = (val & self.and_mask) | self.or_mask;
-                    println!("{:#038b} {}", val, val);
-                    self.mem.insert(*loc, val);
+                Instr::Mem(addr, val) => {
+                    let addrs = self.mask.expand_address(*addr);
+                    for addr in addrs {
+                        self.mem.insert(addr, *val);
+                    }
                 }
             }
         }
-
     }
 
     fn sum(&self) -> u64 {
@@ -51,7 +87,7 @@ impl State {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Instr {
     Mask([Option<bool>; 36]),
-    Mem(usize, u64)
+    Mem(u64, u64)
 }
 
 impl FromStr for Instr {
@@ -72,7 +108,7 @@ impl FromStr for Instr {
                 Ok(Mask(mask))
             },
             (_, Some(caps)) => {
-                Ok(Mem(caps[1].parse::<usize>()?, caps[2].parse::<u64>()?))
+                Ok(Mem(caps[1].parse::<u64>()?, caps[2].parse::<u64>()?))
             },
             _ => Err(anyhow!("bad instr {}", s))
         }
@@ -86,12 +122,12 @@ fn parse_prog(s: &str) -> Result<Vec<Instr>> {
 #[test]
 fn test_run() -> Result<()> {
     let mut state = State::new();
-    let instrs = parse_prog("mask = XXXXXXXXXXXXXXXXXXXXXXXXXXXXX1XXXX0X
-mem[8] = 11
-mem[7] = 101
-mem[8] = 0")?;
+    let instrs = parse_prog("mask = 000000000000000000000000000000X1001X
+mem[42] = 100
+mask = 00000000000000000000000000000000X0XX
+mem[26] = 1")?;
     state.run(&instrs);
-    assert_eq!(state.sum(), 165);
+    assert_eq!(state.sum(), 208);
     Ok(())
 }
 
