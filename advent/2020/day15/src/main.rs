@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     let input = "2,0,1,7,4,14,18";
     let numbers = input.split(',').map(|n| n.parse()).collect::<Result<Vec<u64>, _>>()?;
     let mut s = State::new();
-    s.play(&numbers, 2020);
+    s.play(&numbers, 30000000);
     let answer = s.last_num;
     println!("answer: {:?}", answer);
 
