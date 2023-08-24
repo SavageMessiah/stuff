@@ -8,7 +8,7 @@ lazy_static! {
     static ref RULE: Regex = Regex::new(r"([a-z ]+): (\d+)-(\d+) or (\d+)-(\d+)").unwrap();
 }
 
-type FieldVal = u32;
+type FieldVal = u64;
 type Ticket = Vec<FieldVal>;
 type Rule = (RangeInclusive<FieldVal>, RangeInclusive<FieldVal>);
 
@@ -26,8 +26,25 @@ impl Input {
     fn matches_any_rule(&self, n: FieldVal) -> bool {
         self.rules.values().any(|rule| matches_rule(n, rule))
     }
-    fn error_rate(&self) -> FieldVal {
-        self.nearby.iter().flat_map(|t| t.iter()).filter(|fv| !self.matches_any_rule(**fv)).sum()
+    fn valid_tickets(&self) -> Vec<&Ticket> {
+        self.nearby.iter().filter(move |t| t.iter().all(|n| self.matches_any_rule(*n))).collect()
+    }
+    fn fields(&self) -> Vec<String> {
+        let valid = self.valid_tickets();
+        let mut fields: Vec<Option<String>> = vec![None; self.mine.len()];
+        while fields.iter().any(|f| f.is_none()) {
+            for (name, rule) in &self.rules {
+                let matching_cols = (0..self.mine.len()).filter(|i| {
+                    valid.iter().all(|t| matches_rule(t[*i], &rule) && fields[*i].is_none())
+                }).collect::<Vec<_>>();
+                if matching_cols.len() == 1 {
+                    println!("found unique match for {} at {}", name, matching_cols[0]);
+                    fields[matching_cols[0]] = Some(name.clone());
+                }
+            }
+        }
+
+        fields.into_iter().map(|f| f.unwrap()).collect() //every field should be mapped
     }
 }
 
@@ -66,11 +83,19 @@ impl FromStr for Input {
     }
 }
 
-
 fn main() -> Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let parsed = input.parse::<Input>()?;
-    let answer = parsed.error_rate();
+    let fields = parsed.fields();
+    let answer: FieldVal = fields.iter().zip(parsed.mine.iter()).filter_map(|(f, v)| {
+        if f.starts_with("departure") {
+            println!("{} {}", f, v);
+            Some(v)
+        } else {
+            None
+        }
+    }).product();
+
     println!("answer: {:?}", answer);
 
     Ok(())
