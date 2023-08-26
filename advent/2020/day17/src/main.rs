@@ -3,15 +3,14 @@ use std::{iter::repeat, collections::HashSet, ops::RangeInclusive, convert::TryI
 use anyhow::Result;
 use itertools::{Itertools, MinMaxResult};
 
-type Coord = [i32; 3];
-
+type Coord = [i32; 4];
 
 fn neighbors(coord: &Coord) -> impl Iterator<Item = Coord> + '_ {
-    repeat([1, 0, -1]).take(3).multi_cartesian_product().filter_map(move |v| {
-        if v[0] == 0 && v[1] == 0 && v[2] == 0 {
+    repeat([1, 0, -1]).take(4).multi_cartesian_product().filter_map(move |v| {
+        if v.iter().all(|i| *i == 0) {
             None
         } else {
-            Some([coord[0] + v[0], coord[1] + v[1], coord[2] + v[2]])
+            Some([coord[0] + v[0], coord[1] + v[1], coord[2] + v[2], coord[3] + v[3]])
         }
     })
 }
@@ -30,9 +29,10 @@ fn minmax_range(mm: MinMaxResult<i32>) -> RangeInclusive<i32> {
     }
 }
 
-fn bounds(grid: &Grid) -> [RangeInclusive<i32>; 3] {
+fn bounds(grid: &Grid) -> [RangeInclusive<i32>; 4] {
     [minmax_range(grid.iter().map(|c| c[0]).minmax()),
      minmax_range(grid.iter().map(|c| c[1]).minmax()),
+     minmax_range(grid.iter().map(|c| c[2]).minmax()),
      minmax_range(grid.iter().map(|c| c[2]).minmax())]
 }
 
@@ -70,7 +70,7 @@ fn parse_grid(s: &str) -> Grid {
         let mut x = 0;
         for c in l.chars() {
             if c == '#' {
-                g.insert([x, y, 0]);
+                g.insert([x, y, 0, 0]);
             }
             x += 1;
         }
@@ -84,21 +84,23 @@ fn count_active(grid: &Grid) -> usize {
 }
 
 fn print_grid(grid: &Grid) {
-    let [xb, yb, zb] = bounds(grid);
-    for z in zb.clone() {
-        println!("\nz={}", z);
-        for y in yb.clone() {
-            for x in xb.clone() {
-                let c = if grid.contains(&[x, y, z]) {
-                    '#'
-                } else {
-                    '.'
-                };
-                print!("{}", c);
+    let [xb, yb, zb, wb] = bounds(grid);
+    for w in wb.clone() {
+        for z in zb.clone() {
+            println!("\nz={} w={}", z, w);
+            for y in yb.clone() {
+                for x in xb.clone() {
+                    let c = if grid.contains(&[x, y, z, w]) {
+                        '#'
+                    } else {
+                        '.'
+                    };
+                    print!("{}", c);
+                }
+                println!("");
             }
-            println!("");
-        }
 
+        }
     }
 }
 
@@ -115,7 +117,7 @@ fn test_cycle() {
         grid = cycle(grid);
         print_grid(&grid);
     }
-    assert_eq!(count_active(&grid), 112);
+    assert_eq!(count_active(&grid), 848);
 }
 
 fn main() -> Result<()> {
