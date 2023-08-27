@@ -3,24 +3,31 @@ use std::str::FromStr;
 use winnow::prelude::*;
 use winnow::{
     ascii::{digit1 as digits, space0 as spaces},
-    combinator::alt,
-    combinator::delimited,
-    combinator::fold_repeat,
-    token::one_of,
+    combinator::{alt,
+                 delimited,
+                 fold_repeat,
+                 preceded},
 };
 
 fn expr(i: &mut &str) -> PResult<i64> {
+    let init = add.parse_next(i)?;
+
+    fold_repeat(0..,
+                preceded('*', add),
+                move || init,
+    |acc, val| {
+        acc * val
+    }).parse_next(i)
+}
+
+fn add(i: &mut &str) -> PResult<i64> {
     let init = term.parse_next(i)?;
 
     fold_repeat(0..,
-                (one_of(['+', '*']), term),
+                preceded('+', term),
                 move || init,
-    |acc, (op, val): (char, i64)| {
-        match op {
-            '+' => acc + val,
-            '*' => acc * val,
-            _ => unreachable!("unhandled op")
-        }
+    |acc, val| {
+        acc + val
     }).parse_next(i)
 }
 
