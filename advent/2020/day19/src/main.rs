@@ -21,44 +21,47 @@ enum RuleExp {
     Or(Box<RuleExp>, Box<RuleExp>)
 }
 
-fn is_match<'a>(rules: &HashMap<Id, RuleExp>, rule: &RuleExp, i: &'a str) -> Option<&'a str> {
+fn is_match<'a>(rules: &HashMap<Id, RuleExp>, rule: &RuleExp, i: &'a str) -> Vec<&'a str> {
+    println!("matching \"{}\" against {:?}", i, rule);
     use RuleExp::*;
     let res = match rule {
         Text(t) => {
             if i.len() < t.len() {
-                None
+                vec![]
             } else {
                 let (s, rest) = i.split_at(t.len());
                 if s == t {
-                    Some(rest)
+                    vec![rest]
                 } else {
-                    None
+                    vec![]
                 }
             }
         },
         Seq(ids) => {
-            let mut i = i;
+            let mut results = vec![i];
             for id in ids {
-                let rule = rules.get(&id).unwrap();
-                if let Some(rest) = is_match(rules, rule, i) {
-                    i = rest;
-                } else {
-                    return None;
+                let rule = rules.get(id).unwrap();
+                results = results.iter().flat_map(|i| is_match(rules, rule, i)).collect();
+                if results.is_empty() {
+                    break;
                 }
             }
-            Some(i)
+            results
         },
         Or(l, r) => {
-            is_match(rules, l, i).or(is_match(rules, r, i))
+            let mut res = vec![];
+            res.extend(is_match(rules, l, i));
+            res.extend(is_match(rules, r, i));
+            res
         }
     };
-    println!("matching \"{}\" against {:?} result {:?}", i, rule, res);
+    println!("matched \"{}\" against {:?} result {:?}", i, rule, res);
     res
 }
 
 fn is_match_root(rules: &HashMap<Id, RuleExp>, i: &str) -> bool {
     let root = rules.get(&0).unwrap();
-    is_match(rules, root, i) == Some("")
+    is_match(rules, root, i).contains(&"")
 }
 
 fn id(i: &mut &str) -> PResult<Id> {
@@ -128,9 +131,92 @@ aaaabbb
     assert_eq!(c, 2);
 }
 
+#[test]
+fn test_loop() {
+    let (rules, messages) = parse_input(
+"42: 9 14 | 10 1
+9: 14 27 | 1 26
+10: 23 14 | 28 1
+1: \"a\"
+5: 1 14 | 15 1
+19: 14 1 | 14 14
+12: 24 14 | 19 1
+16: 15 1 | 14 14
+31: 14 17 | 1 13
+6: 14 14 | 1 14
+2: 1 24 | 14 4
+0: 8 11
+13: 14 3 | 1 12
+15: 1 | 14
+17: 14 2 | 1 7
+23: 25 1 | 22 14
+28: 16 1
+4: 1 1
+20: 14 14 | 1 15
+3: 5 14 | 16 1
+27: 1 6 | 14 18
+14: \"b\"
+21: 14 1 | 1 14
+25: 1 1 | 1 14
+22: 14 14
+26: 14 22 | 1 20
+18: 15 15
+7: 14 5 | 1 21
+24: 14 1
+8: 42 | 42 8
+11: 42 31 | 42 11 31
+
+abbbbbabbbaaaababbaabbbbabababbbabbbbbbabaaaa
+bbabbbbaabaabba
+babbbbaabbbbbabbbbbbaabaaabaaa
+aaabbbbbbaaaabaababaabababbabaaabbababababaaa
+bbbbbbbaaaabbbbaaabbabaaa
+bbbababbbbaaaaaaaabbababaaababaabab
+ababaaaaaabaaab
+ababaaaaabbbaba
+baabbaaaabbaaaababbaababb
+abbbbabbbbaaaababbbbbbaaaababb
+aaaaabbaabaaaaababaa
+aaaabbaaaabbaaa
+aaaabbaabbaaaaaaabbbabbbaaabbaabaaa
+babaaabbbaaabaababbaabababaaab
+aabbbbbaabbbaaaaaabbbbbababaaaaabbaaabba
+"
+);
+    let valid = messages.iter().filter(|m| is_match_root(&rules, m)).collect::<Vec<_>>();
+    for m in &valid {
+        println!("valid: {}", m);
+    }
+    assert_eq!(valid.len(), 12);
+}
+
+#[test]
+fn test_loop_simple() {
+    let (rules, messages) = parse_input(
+"0: 3 4
+1: \"a\"
+2: \"b\"
+3: 1 | 1 3
+4: 1 2 | 1 4 2
+
+aaab
+aab
+aaabb
+aaaaabb
+"
+);
+    let valid = messages.iter().filter(|m| is_match_root(&rules, m)).collect::<Vec<_>>();
+    for m in &valid {
+        println!("valid: {}", m);
+    }
+    assert_eq!(valid.len(), 4);
+}
+
 fn main() {
     let input = std::fs::read_to_string("input.txt").unwrap();
-    let (rules, messages) = parse_input(&input);
+    let (mut rules, messages) = parse_input(&input);
+    rules.insert(8, or.parse_peek("42 | 42 8").unwrap().1);
+    rules.insert(11, or.parse_peek("42 31 | 42 11 31").unwrap().1);
 
     let answer = messages.iter().filter(|m| is_match_root(&rules, m)).count();
     println!("answer: {:?}", answer);
