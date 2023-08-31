@@ -1,4 +1,4 @@
-use std::{fmt::{Debug, Write}, iter::once, str::FromStr, collections::{HashMap, HashSet}};
+use std::{fmt::{Debug, Write}, iter::once, str::FromStr, collections::{HashMap, HashSet}, default};
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Tile {
@@ -216,12 +216,12 @@ fn find_matching_tiles<'a>(m: [MatchType; 4], seen: &HashSet<u32>, index: &'a In
 }
 
 #[derive(Clone, Debug)]
-struct PartialSolve<'a> {
-    fits: [[Option<&'a Tile>; 12]; 12],
+struct PartialSolve<'a, const DIM: usize> {
+    fits: [[Option<&'a Tile>; DIM]; DIM],
     seen: HashSet<u32>
 }
 
-impl<'a> PartialSolve<'a> {
+impl<'a, const DIM: usize> PartialSolve<'a, DIM> {
     fn match_spec_at(&self, idx: (usize, usize)) -> [MatchType; 4] {
         let (x, y) = idx;
 
@@ -230,12 +230,12 @@ impl<'a> PartialSolve<'a> {
          } else {
              MatchType::This(self.fits[y - 1][x].unwrap().edges[2])
          },
-         if x == 11 {
+         if x == DIM - 1 {
              MatchType::None
          } else {
              MatchType::Any
          },
-         if y == 11 {
+         if y == DIM - 1 {
              MatchType::None
          } else {
              MatchType::Any
@@ -248,8 +248,8 @@ impl<'a> PartialSolve<'a> {
     }
 
     fn solve(&self, index: &'a Index) -> Option<Vec<Vec<&'a Tile>>> {
-        for y in 0..12 {
-            for x in 0..12 {
+        for y in 0..DIM {
+            for x in 0..DIM {
                 if self.fits[y][x].is_some() {
                     continue;
                 }
@@ -288,24 +288,269 @@ impl<'a> PartialSolve<'a> {
     }
 }
 
-fn main() {
-    let input = std::fs::read_to_string("input.txt").unwrap();
-    let tiles = parse_tiles(&input);
+#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+enum Pixel {
+    #[default]
+    Empty,
+    Wave,
+    Monster
+}
+
+impl<const DIM: usize> Debug for Grid<DIM, Pixel> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for row in self.0 {
+            for col in row {
+                use Pixel::*;
+                f.write_char(match col {
+                    Empty => '.',
+                    Wave => '#',
+                    Monster => 'O'
+                })?;
+            }
+            f.write_char('\n')?;
+        }
+        std::fmt::Result::Ok(())
+    }
+}
+
+fn assemble_image<const DIM: usize>(sol: &Vec<Vec<&Tile>>) -> Grid<DIM, Pixel> {
+    let mut g = [[Pixel::Empty; DIM]; DIM];
+    for y in 0..DIM {
+        for x in 0..DIM {
+            let tile = sol[y / 8][x / 8];
+            g[y][x] = if tile.grid.0[1 + y % 8][1 + x % 8] {
+                Pixel::Wave
+            } else {
+                Pixel::Empty
+            };
+        }
+    }
+    Grid(g)
+}
+
+fn parse_pattern(s: &str) -> Vec<Vec<bool>> {
+    s.lines().map(|l| {
+        l.chars().map(|c| c == '#').collect()
+    }).collect()
+}
+
+fn print_pattern(p: &Vec<Vec<bool>>) {
+    for r in p {
+        for c in r {
+            print!("{}", if *c { '#' } else { ' ' });
+        }
+        println!("");
+    }
+}
+
+fn match_pattern<const DIM: usize>(image: &mut Grid<DIM, Pixel>, at: (usize, usize), pattern: &Vec<Vec<bool>>) -> bool {
+    let needed = pattern.iter().map(|row| row.iter().filter(|p| **p).count()).sum();
+    let (x, mut y) = at;
+    let mut matched = 0usize;
+    for row in pattern {
+        let mut x = x;
+        for pixel in row {
+            if image.0[y][x] == Pixel::Wave && *pixel {
+                matched += 1;
+            }
+            x += 1;
+        }
+        y += 1;
+    }
+    matched == needed
+}
+
+fn mark_pattern<const DIM: usize>(image: &mut Grid<DIM, Pixel>, at: (usize, usize), pattern: &Vec<Vec<bool>>) {
+    for y in 0..pattern.len() {
+        for x in 0..pattern[0].len() {
+            if pattern[y][x] {
+                image.0[at.1 + y][at.0 + x] = Pixel::Monster;
+            }
+        }
+    }
+}
+
+fn find_all_pattern_matches<const DIM: usize>(image: &mut Grid<DIM, Pixel>, pattern: &Vec<Vec<bool>>) -> usize {
+    let pattern_width = pattern[0].len();
+    let pattern_height = pattern.len();
+    let mut found = 0;
+    for y in 0..(DIM - pattern_height) {
+        for x in 0..(DIM - pattern_width) {
+            if match_pattern(image, (x, y), pattern) {
+                mark_pattern(image, (x, y), pattern);
+                found += 1;
+            }
+        }
+    }
+
+    found
+}
+
+fn find_and_mark<const DIM: usize>(image: &Grid<DIM, Pixel>, pattern: &Vec<Vec<bool>>) -> Grid<DIM, Pixel> {
+    for mut p in image.permutations() {
+        if find_all_pattern_matches(&mut p, pattern) > 0 {
+            return p
+        }
+    }
+    unreachable!("shit");
+}
+
+fn count_waves<const DIM: usize>(image: &Grid<DIM, Pixel>) -> usize {
+    image.0.iter().map(|row| row.iter().filter(|p| **p == Pixel::Wave).count()).sum()
+}
+
+fn the_whole_thing<const TILE: usize, const PIXEL: usize>(input: &str) -> usize {
+    let tiles = parse_tiles(input);
     let all = permute_tiles(&tiles);
     let index = index(&all);
 
     let partial = PartialSolve {
-        fits: [[None; 12]; 12],
+        fits: [[None; TILE]; TILE],
         seen: HashSet::new()
     };
 
     let sol = partial.solve(&index).unwrap();
 
-    for row in sol {
+    for row in &sol {
         for col in row {
             print!("{} ", col.id);
         }
         println!("");
     }
 
+    let image = assemble_image::<PIXEL>(&sol);
+
+    println!("{:?}", image);
+
+    let pattern = parse_pattern(
+"                  # \n#    ##    ##    ###\n #  #  #  #  #  #   ");
+
+    print_pattern(&pattern);
+
+    let marked = find_and_mark(&image, &pattern);
+
+    println!("{:?}", marked);
+
+    count_waves(&marked)
+}
+
+#[test]
+fn test() {
+    let input =
+"Tile 2311:
+..##.#..#.
+##..#.....
+#...##..#.
+####.#...#
+##.##.###.
+##...#.###
+.#.#.#..##
+..#....#..
+###...#.#.
+..###..###
+
+Tile 1951:
+#.##...##.
+#.####...#
+.....#..##
+#...######
+.##.#....#
+.###.#####
+###.##.##.
+.###....#.
+..#.#..#.#
+#...##.#..
+
+Tile 1171:
+####...##.
+#..##.#..#
+##.#..#.#.
+.###.####.
+..###.####
+.##....##.
+.#...####.
+#.##.####.
+####..#...
+.....##...
+
+Tile 1427:
+###.##.#..
+.#..#.##..
+.#.##.#..#
+#.#.#.##.#
+....#...##
+...##..##.
+...#.#####
+.#.####.#.
+..#..###.#
+..##.#..#.
+
+Tile 1489:
+##.#.#....
+..##...#..
+.##..##...
+..#...#...
+#####...#.
+#..#.#.#.#
+...#.#.#..
+##.#...##.
+..##.##.##
+###.##.#..
+
+Tile 2473:
+#....####.
+#..#.##...
+#.##..#...
+######.#.#
+.#...#.#.#
+.#########
+.###.#..#.
+########.#
+##...##.#.
+..###.#.#.
+
+Tile 2971:
+..#.#....#
+#...###...
+#.#.###...
+##.##..#..
+.#####..##
+.#..####.#
+#..#.#..#.
+..####.###
+..#.#.###.
+...#.#.#.#
+
+Tile 2729:
+...#.#.#.#
+####.#....
+..#.#.....
+....#..#.#
+.##..##.#.
+.#.####...
+####.#.#..
+##.####...
+##..#.##..
+#.##...##.
+
+Tile 3079:
+#.#.#####.
+.#..######
+..#.......
+######....
+####.#..#.
+.#...#.##.
+#.#####.##
+..#.###...
+..#.......
+..#.###...";
+
+    assert_eq!(the_whole_thing::<3, 24>(input), 273);
+}
+
+fn main() {
+    let input = std::fs::read_to_string("input.txt").unwrap();
+    let answer = the_whole_thing::<12, 96>(&input);
+
+    println!("Wave pixels: {}", answer);
 }
