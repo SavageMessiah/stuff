@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashSet, HashMap};
 
 type Card = u32;
 type Deck = VecDeque<Card>;
@@ -22,23 +22,51 @@ fn draw_cards(decks: &mut Vec<Deck>) -> Vec<Card> {
     cards
 }
 
-fn play_game(decks: &Vec<Deck>) -> (usize, Deck) {
-    let mut decks = decks.clone();
+fn round_winner(cards: &Vec<Card>, decks: &Vec<Deck>, game_memo: &mut HashMap<Vec<Deck>, (usize, Deck)>) -> usize {
+    if cards.iter().enumerate().all(|(player, card)| decks[player].len() >= *card as usize) {
+        println!("Recursing!");
+        let mut sub_decks = vec![];
+        for (player, card) in cards.iter().enumerate() {
+            sub_decks.push(decks[player].iter().take(*card as usize).copied().collect::<Deck>());
+        }
+        return play_game(&sub_decks, game_memo).0
+    }
+    cards.iter().enumerate().max_by_key(|(_, card)| *card).unwrap().0
+}
+
+fn play_game(starting_decks: &Vec<Deck>, game_memo: &mut HashMap<Vec<Deck>, (usize, Deck)>) -> (usize, Deck) {
+    if let Some(win) = game_memo.get(starting_decks) {
+        println!("Previous game win: {:?}", win);
+        return win.clone();
+    }
+    let mut previous_states = HashSet::new();
+    let mut decks = starting_decks.clone();
     for round in 1.. {
-        println!("Round {}", round);
-        let mut cards = draw_cards(&mut decks);
-        println!("Draws: {:?}", cards);
-        let round_winner = cards.iter().enumerate().max_by_key(|(_, card)| *card).unwrap().0;
-        println!("Round winner: {}", round_winner + 1);
-        cards.sort();
-        cards.reverse();
-        decks[round_winner].extend(cards);
+        //println!("Round {}", round);
+        if previous_states.contains(&decks) {
+            return(0, decks[0].clone())
+        }
+        previous_states.insert(decks.clone());
+
+        let cards = draw_cards(&mut decks);
+        //println!("Draws: {:?}", cards);
+        let round_winner = round_winner(&cards, &decks, game_memo);
+        //println!("Round winner: {}", round_winner + 1);
+        //annoying that it no longer obviously generalizes to n players
+        decks[round_winner].push_back(cards[round_winner]);
+        decks[round_winner].push_back(cards[(round_winner + 1) % 2]);
 
         if let Some(winner) = winner(&decks) {
+            game_memo.insert(starting_decks.clone(), winner.clone());
             return winner
         }
     }
     unreachable!()
+}
+
+fn play(starting_decks: &Vec<Deck>) -> (usize, Deck) {
+    let mut game_memo = HashMap::new();
+    play_game(starting_decks, &mut game_memo)
 }
 
 fn score_deck(deck: &Deck) -> u32 {
@@ -82,9 +110,27 @@ Player 2:
 7
 10";
     let decks = parse_decks(input)?;
-    let (player, deck) = play_game(&decks);
+    let (player, deck) = play(&decks);
     assert_eq!(player, 1);
-    assert_eq!(score_deck(&deck), 306);
+    assert_eq!(score_deck(&deck), 291);
+    Ok(())
+}
+
+#[test]
+fn test_loop() -> Result<()> {
+    let input = "Player 1:
+43
+19
+
+Player 2:
+2
+29
+14";
+    let decks = parse_decks(input)?;
+    let (player, deck) = play(&decks);
+    println!("deck: {:?}", deck);
+    assert_eq!(player, 0);
+    assert_eq!(score_deck(&deck), 105);
     Ok(())
 }
 
@@ -92,7 +138,7 @@ fn main() -> Result<()> {
     let input = std::fs::read_to_string("input.txt").unwrap();
     let decks = parse_decks(&input)?;
     print_decks(&decks);
-    let (player, deck) = play_game(&decks);
+    let (player, deck) = play(&decks);
 
     println!("player {} won with {} points", player + 1, score_deck(&deck));
     Ok(())
