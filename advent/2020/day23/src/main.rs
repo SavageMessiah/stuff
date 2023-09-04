@@ -1,67 +1,103 @@
-use std::collections::VecDeque;
-use itertools::Itertools;
+use std::collections::HashMap;
 
-fn rotate(circle: &mut VecDeque<u32>) {
-    circle.rotate_left(1);
+struct Circle {
+    current: u64,
+    max: u64,
+    all: HashMap<u64, u64>,
+    remove_buf: [u64; 3]
 }
 
-fn rotate_to(circle: &mut VecDeque<u32>, to: u32) {
-    while circle.back().unwrap() != &to {
-        rotate(circle);
+fn find_destination2(current: u64, max: u64, removed: &[u64; 3]) -> u64 {
+    let mut dest = current - 1;
+    while removed.contains(&dest) {
+        dest = dest - 1;
+    }
+    if dest == 0 {
+        return find_destination2(max + 1, max, removed);
+
+    }
+    dest
+}
+
+impl Circle {
+    fn new(contents: impl IntoIterator<Item = u64>) -> Circle {
+        let mut iter = contents.into_iter();
+        let current = iter.next().unwrap();
+        let mut all = HashMap::new();
+        let mut last = current;
+        for n in iter {
+            all.insert(last, n);
+            last = n;
+        }
+        all.insert(last, current);
+        let max = *all.keys().max().unwrap();
+
+        Circle {
+            all, current, max, remove_buf: [0; 3]
+        }
+    }
+
+    fn next(&self, n: u64) -> u64 {
+        *self.all.get(&n).unwrap()
+    }
+
+    fn make_move(&mut self) {
+        let mut next = self.current;
+        //get the next 3 after current
+        for i in 0..3 {
+            next = self.next(next);
+            self.remove_buf[i] = next;
+        }
+        //slice them out of the ring
+        self.all.insert(self.current, self.next(next));
+        let dest = find_destination2(self.current, self.max, &self.remove_buf);
+
+        //splice them back in
+        let end = self.next(dest);
+        self.all.insert(dest, self.remove_buf[0]);
+        self.all.insert(self.remove_buf[2], end);
+
+        self.current = self.next(self.current);
+    }
+
+    fn make_moves(&mut self, n: usize) {
+        for i in 1..=n {
+            self.make_move()
+        }
+    }
+
+    fn result_string(&self) -> String {
+        let mut s = "".to_string();
+        let mut next = self.next(1);
+        while next != 1 {
+            s.push_str(next.to_string().as_str());
+            next = self.next(next);
+        }
+        s
+    }
+
+    fn result_product(&self) -> u64 {
+        let first = self.next(1);
+        let second = self.next(first);
+        first * second
     }
 }
 
-fn parse_input(s: &str) -> VecDeque<u32> {
-    let mut circle = s.chars().map(|c| c.to_digit(10).unwrap() ).collect::<VecDeque<u32>>();
-    //rotate current cup to tail of queue
-    rotate(&mut circle);
-    circle
+fn parse_input(s: &str) -> Vec<u64> {
+    s.chars().map(|c| c.to_digit(10).unwrap() as u64 ).collect()
 }
 
-fn find_destination(circle: &VecDeque<u32>) -> u32 {
-    let current = circle.back().unwrap();
-    let (greater, lesser): (Vec<_>, Vec<_>) = circle.iter().take(circle.len() - 1).partition(|n| *n > current);
-    *lesser.iter().max().or(greater.iter().max()).unwrap()
-}
-
-fn make_move(circle: &mut VecDeque<u32>) {
-    let current = *circle.back().unwrap();
-    let removed = circle.drain(0..3).collect::<Vec<_>>();
-    let destination = find_destination(circle);
-    println!("after remove: circle: {:?} removed: {:?} current: {} destination: {}", circle, removed, current, destination);
-    rotate_to(circle, destination);
-    println!("{:?}", circle);
-    circle.extend(removed);
-    println!("{:?}", circle);
-    rotate_to(circle, current);
-    println!("{:?}", circle);
-    rotate(circle);
-    println!("end of move: circle: {:?}", circle);
-}
-
-fn make_moves(circle: &mut VecDeque<u32>, n: usize) {
-    for i in 1..=n {
-        println!("MOVE {}", i);
-        make_move(circle);
-        println!("");
-    }
-}
-
-fn circle_string(circle: &VecDeque<u32>) -> String {
-    let mut circle = circle.clone();
-    rotate_to(&mut circle, 1);
-    circle.iter().take(circle.len() - 1).join("")
-}
 
 #[test]
 fn test_make_moves() {
-    let mut circle = parse_input("389125467");
-    make_moves(&mut circle, 10);
-    assert_eq!(circle_string(&circle), "92658374");
+    let mut circle = Circle::new(parse_input("389125467"));
+    circle.make_moves(10);
+    assert_eq!(circle.result_string(), "92658374");
 }
 
 fn main() {
-    let mut circle = parse_input("253149867");
-    make_moves(&mut circle, 100);
-    println!("{}", circle_string(&circle));
+    let parsed = parse_input("253149867");
+    let mut circle = Circle::new(parsed.iter().copied().chain(10u64..=1000000));
+    circle.make_moves(10000000);
+    println!("{}", circle.result_product());
 }
