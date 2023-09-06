@@ -31,6 +31,7 @@ fn test_transform() {
 }
 
 fn main() {
+    //there is no part 2
     let keys = [11562782u64, 18108497];
 
     let loop_size = loop_size(keys[0]);
