@@ -25,7 +25,8 @@ impl FromStr for Command {
 
 struct Sub {
     pos: u32,
-    depth: u32
+    depth: u32,
+    aim: u32,
 }
 
 impl Sub {
@@ -33,9 +34,12 @@ impl Sub {
         for c in commands {
             use Command::*;
             match c {
-                Forward(a) => self.pos += a,
-                Down(a) => self.depth += a,
-                Up(a) => self.depth -= a,
+                Forward(a) => {
+                    self.pos += a;
+                    self.depth += self.aim * a;
+                },
+                Down(a) => self.aim += a,
+                Up(a) => self.aim -= a,
             }
         }
     }
@@ -50,6 +54,7 @@ fn main() -> anyhow::Result<()> {
     let mut sub = Sub {
         pos: 0,
         depth: 0,
+        aim: 0,
     };
 
     sub.exec(&commands);
