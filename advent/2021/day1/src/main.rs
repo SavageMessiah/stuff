@@ -6,7 +6,7 @@ fn main() -> anyhow::Result<()> {
                       .map(|l| l.parse())
         .collect::<Result<Vec<u32>, _>>()?;
 
-    let answer = depths.into_iter().tuple_windows().filter(|(a, b)| b > a).count();
+    let answer = depths.windows(3).map(|w| w.iter().sum::<u32>()).tuple_windows().filter(|(a, b)| b > a).count();
 
     println!("answer {}", answer);
 
