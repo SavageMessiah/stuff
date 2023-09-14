@@ -1,7 +1,5 @@
-use std::{num::ParseIntError, iter::repeat};
-
 use itertools::Itertools;
-
+use std::num::ParseIntError;
 
 type Fish = [u64; 9];
 
@@ -15,14 +13,9 @@ fn parse_input(s: &str) -> Result<Fish, ParseIntError> {
     Ok(fish)
 }
 
-fn step(fish: &Fish) -> Fish {
-    let mut next = [0u64; 9];
-    next[8] = fish[0];
-    for i in 1..=8 {
-        next[i - 1] = fish[i];
-    }
-    next[6] += fish[0];
-    next
+fn step(fish: &mut Fish) {
+    fish.rotate_left(1);
+    fish[6] += fish[8];
 }
 
 fn count_fish(fish: &Fish) -> u64 {
@@ -33,7 +26,7 @@ fn run(initial_fish: &Fish, steps: u32) -> u64 {
     let mut fish = initial_fish.clone();
     println!("initial fish: {} {:?}", count_fish(&fish), fish);
     for i in 1..=steps {
-        fish = step(&fish);
+        step(&mut fish);
         println!("after {} days: {} {:?}", i, count_fish(&fish), fish);
     }
 
