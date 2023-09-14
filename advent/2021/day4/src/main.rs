@@ -76,16 +76,27 @@ fn score(board: &Board) -> u32 {
     score
 }
 
-fn play(boards: &mut Vec<Board>, numbers: &[u32]) -> u32 {
+fn play(boards: &Vec<Board>, numbers: &[u32]) -> u32 {
+    let mut boards = boards.clone();
+    let mut winners = vec![];
     for n in numbers {
+        let mut remaining_boards = vec![];
         for board in &mut *boards {
             mark(board, *n);
             if is_winner(board) {
-                return score(board) * *n;
+                winners.push((board.clone(), *n));
+            } else {
+                remaining_boards.push(board.clone());
             }
         }
+        if remaining_boards.is_empty() {
+            break;
+        }
+        boards = remaining_boards;
     }
-    unreachable!()
+
+    let (board, n) = winners.last().unwrap();
+    score(&board) * n
 }
 
 #[test]
@@ -109,7 +120,7 @@ fn test_play() {
 18  8 23 26 20
 22 11 13  6  5
  2  0 12  3  7").unwrap();
-    assert_eq!(play(&mut boards, &numbers), 4512);
+    assert_eq!(play(&mut boards, &numbers), 1924);
 }
 
 
