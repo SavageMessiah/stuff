@@ -85,9 +85,6 @@ fn mark_line(map: &mut Map, l: &Line) {
 fn find_danger(lines: &[Line]) -> usize {
     let mut map = Map::new();
     for l in lines {
-        if l.is_diagonal() {
-            continue;
-        }
         mark_line(&mut map, l);
     }
     map.values().filter(|p| **p > 1).count()
@@ -111,7 +108,7 @@ fn test_score() {
 0,0 -> 8,8
 5,5 -> 8,2").unwrap();
 
-    assert_eq!(find_danger(&lines), 5);
+    assert_eq!(find_danger(&lines), 12);
 }
 
 
