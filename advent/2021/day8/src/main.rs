@@ -1,48 +1,85 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+
+use itertools::Itertools;
 
 #[derive(Debug)]
 struct Note {
-    signals: Vec<String>,
-    digits: Vec<String>
+    signals: Vec<HashSet<char>>,
+    digits: Vec<HashSet<char>>
 }
 
 impl Note {
-    fn identify_digits(&self) -> Vec<Option<u8>> {
-        self.digits.iter().map(|d| {
-            match d.len() {
-                2 => Some(1),
-                3 => Some(7),
-                4 => Some(4),
-                7 => Some(8),
-                _ => None,
+    fn signal_mapping(&self) -> HashMap<char, char> {
+        let by_len = self.signals.iter().into_group_map_by(|s| s.len());
+        let one = by_len[&2].first().unwrap();
+        let seven = by_len[&3].first().unwrap();
+        let four = by_len[&4].first().unwrap();
+        let four_seven = four.union(seven).copied().collect();
+
+        let mut mapping = HashMap::new();
+
+        let a = seven.difference(&one).nth(0).unwrap();
+        mapping.insert(*a, 'a');
+
+        let bd = four.difference(&one).copied().collect::<HashSet<char>>();
+
+        let (five, two_three): (Vec<&HashSet<_>>, Vec<&HashSet<_>>) = by_len[&5].iter().partition(|s| s.intersection(&bd).count() == 2);
+        let five = five.first().unwrap();
+        let g = five.difference(&four_seven).nth(0).unwrap();
+        mapping.insert(*g, 'g');
+
+        for seg in bd {
+            if two_three.iter().all(|s| s.contains(&seg)) {
+                mapping.insert(seg, 'd');
+            } else {
+                mapping.insert(seg, 'b');
             }
-        }).collect()
+        }
+
+        for signal in two_three {
+            //this signal is 2
+            let Some(e) = signal.iter().find(|seg| !mapping.contains_key(seg) && !one.contains(seg)) else { continue; };
+            mapping.insert(*e, 'e');
+            for seg in one.iter() {
+                if signal.contains(seg) {
+                    mapping.insert(*seg, 'c');
+                } else {
+                    mapping.insert(*seg, 'f');
+                }
+            }
+
+        }
+
+        mapping
+    }
+
+    fn as_int(&self) -> u32 {
+        let digits = ["abcefg", "cf", "acdeg", "acdfg", "bcdf", "abdfg", "abdefg", "acf", "abcdefg", "abcdfg"];
+        let mapping = self.signal_mapping();
+        self.digits.iter().map(|digit| {
+            let mapped = digit.iter().map(|seg| mapping[seg]).sorted().collect::<String>();
+            digits.iter().position(|d| *d == mapped).unwrap().to_string()
+        }).collect::<String>().parse().unwrap()
     }
 }
 
-fn to_sorted(s: &str) -> String {
-    let mut chars = s.chars().collect::<Vec<_>>();
-    chars.sort();
-    chars.iter().collect()
+fn to_signal(s: &str) -> HashSet<char> {
+    s.chars().collect()
 }
 
 fn parse_input(s: &str) -> Vec<Note> {
     s.lines().map(|l| {
         let (signals, digits) = l.split_once(" | ").unwrap();
         Note {
-            signals: signals.split(' ').map(to_sorted).collect(),
-            digits: digits.split(' ').map(to_sorted).collect()
+            signals: signals.split(' ').map(to_signal).collect(),
+            digits: digits.split(' ').map(to_signal).collect()
         }
 
     }).collect()
 }
 
-fn count_identified_digits(notes: &[Note]) -> HashMap<u8, usize> {
-    notes.iter().flat_map(Note::identify_digits).flatten().counts()
-}
-
 #[test]
-fn test_parse_and_count() {
+fn test_parse_and_convert() {
     let notes = parse_input("be cfbegad cbdgef fgaecd cgeb fdcge agebfd fecdb fabcd edb | fdgacbe cefdb cefbgd gcbe
 edbfga begcd cbg gc gcadebf fbgde acbgfd abcde gfcbed gfec | fcgedb cgb dgebacf gc
 fgaebd cg bdaec gdafb agbcfd gdcbef bgcad gfac gcb cdgabef | cg cg fdcagb cbg
@@ -53,17 +90,17 @@ dbcfg fgd bdegcaf fgec aegbdf ecdfab fbedc dacgb gdcebf gf | cefg dcbef fcge gbc
 bdfegc cbegaf gecbf dfcage bdacg ed bedf ced adcbefg gebcd | ed bcgafe cdgba cbgef
 egadfb cdbfeg cegd fecab cgb gbdefca cg fgcdab egfdb bfceg | gbdfcae bgc cg cgb
 gcafb gcf dcaebfg ecagb gf abcdeg gaef cafbge fdbac fegbdc | fgae cfgab fg bagce");
-    let counts = count_identified_digits(&notes);
+    let ints = notes.iter().map(Note::as_int).collect::<Vec<_>>();
 
-    assert_eq!(counts.values().sum::<usize>(), 26);
+    assert_eq!(ints, vec![8394, 9781, 1197, 9361, 4873, 8418, 4548, 1625, 8717, 4315]);
 }
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let notes = parse_input(&input);
-    let counts = count_identified_digits(&notes);
+    let answer = notes.iter().map(Note::as_int).sum::<u32>();
 
-    println!("{}", counts.values().sum::<usize>());
+    println!("{}", answer);
 
     Ok(())
 }
