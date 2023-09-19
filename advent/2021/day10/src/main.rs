@@ -1,23 +1,27 @@
+use itertools::Itertools;
+
 #[derive(Debug, Eq, PartialEq)]
 enum Status {
     Ok,
-    Incomplete,
+    Incomplete(Vec<char>),
     Corrupt(char),
     BadChar(char)
 }
 
 impl Status {
-    fn score(&self) -> u64 {
+    fn score(&self) -> Option<u64> {
         use Status::*;
         match self {
-            Corrupt(c) => match c {
-                ')' => 3,
-                ']' => 57,
-                '}' => 1197,
-                '>' => 25137,
-                _ => unreachable!()
-            },
-            _ => 0
+            Incomplete(stack) =>
+                Some(stack.iter().rev().fold(0, |score, c|
+                                  score * 5 + (match c {
+                    '(' => 1,
+                    '[' => 2,
+                    '{' => 3,
+                    '<' => 4,
+                    _ => unreachable!()
+                }))),
+            _ => None
         }
     }
 }
@@ -53,12 +57,14 @@ fn check_line(line: &str) -> Status {
     if stack.is_empty() {
         Status::Ok
     } else {
-        Status::Incomplete
+        Status::Incomplete(stack)
     }
 }
 
 fn score_input(input: &str) -> u64 {
-    input.lines().map(|l| check_line(l).score() ).sum()
+    let mut scores = input.lines().filter_map(|l| check_line(l).score() ).collect_vec();
+    scores.sort();
+    scores[scores.len() / 2]
 }
 
 #[test]
@@ -74,7 +80,7 @@ fn test_parse_and_answer() {
 <{([([[(<>()){}]>(<<{{
 <{([{{}}[<[[[<>{}]]]>[]]";
 
-    assert_eq!(score_input(input), 26397);
+    assert_eq!(score_input(input), 288957);
 }
 
 fn main() -> anyhow::Result<()> {
