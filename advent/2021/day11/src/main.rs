@@ -79,9 +79,7 @@ fn step(grid: &mut Octogrid) -> u32 {
     flashed
 }
 
-fn steps(grid: &mut Octogrid, n: u32) -> u32 {
-    let mut total_flashed = 0;
-
+fn steps(grid: &mut Octogrid) -> Option<u32> {
     for row in &*grid {
         for octopus in row {
             print!("{}", octopus.energy);
@@ -89,12 +87,14 @@ fn steps(grid: &mut Octogrid, n: u32) -> u32 {
         println!("");
     }
     println!("\n");
-    for i in 1..=n {
+    for i in 1.. {
         let flashed = step(grid);
         println!("step {}: {} flashed", i, flashed);
-        total_flashed += flashed;
+        if flashed == (grid.len() * grid[0].len()) as u32 {
+            return Some(i)
+        }
     }
-    total_flashed
+    None
 }
 
 fn parse_input(input: &str) -> anyhow::Result<Octogrid> {
@@ -123,15 +123,14 @@ fn test_parse_and_answer() {
 4846848554
 5283751526").unwrap();
 
-    assert_eq!(steps(&mut grid, 10), 204);
-    assert_eq!(steps(&mut grid, 90), 1656 - 204);
+    assert_eq!(steps(&mut grid).unwrap(), 195);
 }
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let mut grid = parse_input(&input)?;
 
-    println!("{}", steps(&mut grid, 100));
+    println!("{}", steps(&mut grid).unwrap());
 
     Ok(())
 }
