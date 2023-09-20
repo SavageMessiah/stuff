@@ -1,7 +1,6 @@
 use std::{collections::{HashMap, HashSet}, str::FromStr};
 
 use anyhow::anyhow;
-use itertools::Itertools;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum Cave {
@@ -29,6 +28,22 @@ impl FromStr for Cave {
 type Caves = HashMap<Cave, HashSet<Cave>>;
 type Path = Vec<Cave>;
 
+fn has_double_small_cave(path: &Path) -> bool {
+    let mut seen = HashSet::new();
+    for cave in path {
+        match cave {
+            cave @ Cave::Small(_) => if seen.contains(&cave) {
+                return true;
+            } else {
+                seen.insert(cave);
+            },
+            _ => ()
+        }
+    }
+
+    false
+}
+
 fn extend_paths(caves: &Caves, starts: &Vec<Path>) -> Vec<Path> {
     use Cave::*;
     let mut extended = vec![];
@@ -53,8 +68,8 @@ fn extend_paths(caves: &Caves, starts: &Vec<Path>) -> Vec<Path> {
                     println!("path looped to start");
                     continue;
                 },
-                cave @ Small(_) if path.contains(cave) => {
-                    println!("small cave already passed");
+                cave @ Small(_) if has_double_small_cave(path) && path.contains(cave) => {
+                    println!("small cave already passed twice");
                     continue;
                 },
                 cave => {
@@ -103,7 +118,12 @@ b-end").unwrap();
 
     println!("{:?}", caves);
 
-    assert_eq!(all_paths(&caves).len(), 10);
+    let paths = all_paths(&caves);
+    for path in &paths {
+        println!("{:?}", path);
+    }
+
+    assert_eq!(paths.len(), 36);
 }
 
 fn main() -> anyhow::Result<()> {
