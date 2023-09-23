@@ -108,9 +108,12 @@ fold along x=5").unwrap();
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let (mut sheet, folds) = parse_input(&input)?;
-    sheet = folds[0].fold(&sheet);
+    for fold in folds {
+        println!("folding {:?}", fold);
+        sheet = fold.fold(&sheet);
+    }
 
-    println!("{}", sheet.len());
+    print_sheet(&sheet);
 
     Ok(())
 }
