@@ -27,6 +27,24 @@ struct Map {
 }
 
 impl Map {
+    fn hugify(&self, n: usize) -> Map {
+        let mut map = Map {
+            costs: vec![],
+            width: self.width * n,
+            height: self.height * n
+        };
+
+        for y in 0..map.height {
+            for x in 0..map.width {
+                let mut cost = self.cost_at((x % self.width, y % self.height)) as usize + (y / self.height) + (x / self.width);
+                cost = (cost - 1) % 9 + 1;
+                map.costs.push(cost as u8);
+            }
+        }
+        map
+    }
+
+
     fn cost_at(&self, pos: Position) -> u8 {
         self.costs[pos.1 * self.width + pos.0]
     }
@@ -77,8 +95,6 @@ impl Map {
     }
 }
 
-
-
 fn parse_input(input: &str) -> Map {
     let mut map = Map {
         costs: vec![],
@@ -109,16 +125,16 @@ fn test_parse_apply_score() {
 1359912421
 3125421639
 1293138521
-2311944581");
+2311944581").hugify(5);
 
     let path_cost = map.shortest_path();
 
-    assert_eq!(path_cost, 40);
+    assert_eq!(path_cost, 315);
 }
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
-    let map = parse_input(&input);
+    let map = parse_input(&input).hugify(5);
     let path_cost = map.shortest_path();
 
     println!("{}", path_cost);
