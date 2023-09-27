@@ -4,9 +4,20 @@ use bitstream_io::{FromBitStream, BitReader, BigEndian, BitRead, BitWriter, BitW
 use hex::decode;
 
 #[derive(Debug)]
+enum Operator {
+    Sum,
+    Product,
+    Min,
+    Max,
+    GT,
+    LT,
+    EQ
+}
+
+#[derive(Debug)]
 enum PacketBody {
-    Literal(Vec<u8>),
-    Operator(u8, Vec<Packet>)
+    Literal(u64),
+    Operator(Operator, Vec<Packet>)
 }
 
 #[derive(Debug)]
@@ -22,6 +33,32 @@ impl Packet {
             PacketBody::Operator(_, packets) => packets.iter().map(|p| p.version_sum() ).sum()
         }
     }
+
+    fn eval(&self) -> u64 {
+        use Operator::*;
+        match &self.body {
+            PacketBody::Literal(lit) => *lit,
+            PacketBody::Operator(op, packets) => {
+                let mut evaled = packets.iter().map(|p| p.eval());
+                match op {
+                    Sum => evaled.sum(),
+                    Product => evaled.product(),
+                    Min => evaled.min().unwrap(),
+                    Max => evaled.max().unwrap(),
+                    binop => {
+                        let a = evaled.next().unwrap();
+                        let b = evaled.next().unwrap();
+                        match binop {
+                            GT => a > b,
+                            LT => a < b,
+                            EQ => a == b,
+                            _ => unreachable!()
+                        }.into()
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl FromBitStream for Packet {
@@ -34,16 +71,14 @@ impl FromBitStream for Packet {
         let body = match type_id {
             4 => {
                 println!("reading literal");
-                let mut lit = vec![];
-                let mut writer = BitWriter::endian(&mut lit, BigEndian);
+                let mut lit = 0u64;
                 loop {
                     let cont = r.read_bit()?;
-                    writer.write(4, r.read::<u8>(4)?)?;
+                    lit = (lit << 4) + r.read::<u64>(4)?;
                     if !cont {
                         break;
                     }
                 }
-                writer.byte_align()?;
                 PacketBody::Literal(lit)
             },
             id => {
@@ -83,7 +118,19 @@ impl FromBitStream for Packet {
                     }
                 }
 
-                PacketBody::Operator(id, packets)
+                use Operator::*;
+                let op = match id {
+                    0 => Sum,
+                    1 => Product,
+                    2 => Min,
+                    3 => Max,
+                    5 => GT,
+                    6 => LT,
+                    7 => EQ,
+                    _ => unreachable!()
+                };
+
+                PacketBody::Operator(op, packets)
             }
         };
 
@@ -100,7 +147,24 @@ fn parse_input(input: &str) -> anyhow::Result<Packet> {
 }
 
 #[test]
-fn parse_and_sum() {
+fn test_eval() {
+    let tests = [("C200B40A82", 3),
+    ("04005AC33890", 54),
+    ("880086C3E88112", 7),
+    ("CE00C43D881120", 9),
+    ("D8005AC2A8F0", 1),
+    ("F600BC2D8F", 0),
+    ("9C005AC2F8F0", 0),
+    ("9C0141080250320F1802104A08", 1)];
+
+    for (hex, ex) in tests {
+        let packet = parse_input(hex).unwrap();
+        assert_eq!(packet.eval(), ex);
+    }
+}
+
+#[test]
+fn test_parse_and_sum() {
     let packet = parse_input("8A004A801A8002F478").unwrap();
     assert_eq!(packet.version_sum(), 16);
 
@@ -119,6 +183,7 @@ fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let packet = parse_input(&input)?;
     println!("version sum: {}", packet.version_sum());
+    println!("eval result: {}", packet.eval());
 
     Ok(())
 }
