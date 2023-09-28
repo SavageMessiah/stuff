@@ -9,6 +9,10 @@ struct Area {
 }
 
 fn shot(mut vel: (i32, i32), area: &Area) -> Option<i32> {
+    if vel == (0, 0) {
+        return None;
+    }
+
     let mut pos = (0, 0);
     let mut highest_y = 0;
 
@@ -40,6 +44,10 @@ fn highest_y(area: &Area) -> i32 {
     (1..100).cartesian_product(1..100).filter_map(|vel| shot(vel, area)).max().unwrap()
 }
 
+fn distinct_vel(area: &Area) -> usize {
+    (1..315).cartesian_product(-81..1000).filter_map(|vel| shot(vel, area)).count()
+}
+
 #[test]
 fn test_shot() {
     let area = Area {
@@ -53,6 +61,15 @@ fn test_shot() {
 fn test_parse_and_highest() {
     let area = parse_input("target area: x=20..30, y=-10..-5").unwrap();
     assert_eq!(highest_y(&area), 45);
+}
+
+#[test]
+fn test_distinct_vel() {
+    let area = Area {
+        x: 20..=30,
+        y: -10..=-5
+    };
+    assert_eq!(distinct_vel(&area), 112);
 }
 
 fn parse_input(input: &str) -> anyhow::Result<Area> {
@@ -71,7 +88,8 @@ fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let area = parse_input(&input)?;
 
-    println!("{}", highest_y(&area));
+    println!("highest_y: {}", highest_y(&area));
+    println!("distinct_vels: {}", distinct_vel(&area));
 
     Ok(())
 }
