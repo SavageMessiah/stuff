@@ -1,4 +1,5 @@
 use std::{fmt::{Display, Write}, str::FromStr};
+use itertools::Itertools;
 use winnow::{
     prelude::*,
     ascii::{digit1 as digits, space0 as spaces},
@@ -7,7 +8,7 @@ use winnow::{
                  separated_pair},
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Eq, Clone, PartialEq)]
 enum SnailNum {
     Pair(Box<SnailNum>, Box<SnailNum>),
     Num(u32)
@@ -32,12 +33,12 @@ impl SnailNum {
                 (Num(l), Num(r)) if depth >= 4 => {
                     let pair = [*l, *r];
                     *self = Num(0);
-                    println!("exploding: {:?}", pair);
+                    //println!("exploding: {:?}", pair);
                     Explode(pair)
                 },
                 (l, r) => {
                     let lex = l.explode(depth + 1);
-                    println!("left explode result {:?}", lex);
+                    //println!("left explode result {:?}", lex);
                     match lex {
                         None => (),
                         Exploded => return Exploded,
@@ -55,7 +56,7 @@ impl SnailNum {
                     }
 
                     let rex = r.explode(depth + 1);
-                    println!("right explode result {:?}", rex);
+                    //println!("right explode result {:?}", rex);
                     match rex {
                         None => None,
                         Exploded => Exploded,
@@ -96,7 +97,7 @@ impl SnailNum {
         match self {
             Num(n) if *n >= 10 => {
                 let div = *n as f32 / 2.0;
-                println!("splitting: {}", n);
+                //println!("splitting: {}", n);
                 *self = Pair(Box::new(Num(div.floor() as u32)), Box::new(Num(div.ceil() as u32)));
                 true
             },
@@ -122,12 +123,12 @@ impl SnailNum {
     fn reduce(&mut self) {
         loop {
             if self.explode(0) != ExplodeResult::None {
-                println!("after explode: {}", self);
+                //println!("after explode: {}", self);
                 continue;
             }
 
             if self.split() {
-                println!("after split: {}", self);
+                //println!("after split: {}", self);
                 continue;
             }
 
@@ -140,10 +141,17 @@ impl std::ops::Add for SnailNum {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         let mut res = SnailNum::Pair(Box::new(self), Box::new(rhs));
-        println!("after addition: {}", res);
+        //println!("after addition: {}", res);
         res.reduce();
-        println!("after reduce: {}", res);
+        //println!("after reduce: {}", res);
         res
+    }
+}
+
+impl<'a, 'b> std::ops::Add<&'a SnailNum> for &'b SnailNum {
+    type Output = SnailNum;
+    fn add(self, rhs: &'a SnailNum) -> Self::Output {
+        self.clone() + rhs.clone()
     }
 }
 
@@ -195,6 +203,16 @@ fn parse_input(input: &str) -> anyhow::Result<Vec<SnailNum>> {
     input.lines().map(FromStr::from_str).collect()
 }
 
+fn biggest_magnitude(nums: &[SnailNum]) -> u32 {
+    nums.iter()
+        .cartesian_product(nums)
+        .filter(|(l, r)| l != r)
+        .flat_map(|(l, r)| [l + r, r + l])
+        .map(|sn| sn.magnitude())
+        .max()
+        .unwrap()
+}
+
 #[test]
 fn test_parse_and_add() {
 
@@ -237,6 +255,22 @@ fn test_parse_and_add() {
     }
 }
 
+#[test]
+fn test_biggest_magnitude() {
+    let nums = parse_input("[[[0,[5,8]],[[1,7],[9,6]]],[[4,[1,2]],[[1,4],2]]]
+[[[5,[2,8]],4],[5,[[9,9],0]]]
+[6,[[[6,2],[5,6]],[[7,6],[4,7]]]]
+[[[6,[0,7]],[0,9]],[4,[9,[9,0]]]]
+[[[7,[6,4]],[3,[1,3]]],[[[5,5],1],9]]
+[[6,[[7,3],[3,2]]],[[[3,8],[5,7]],4]]
+[[[[5,4],[7,7]],8],[[8,3],8]]
+[[9,3],[[9,9],[6,[4,9]]]]
+[[2,[[7,7],7]],[[5,8],[[9,3],[0,2]]]]
+[[[[5,2],5],[8,[3,7]]],[[5,[7,5]],[4,4]]]").unwrap();
+
+    assert_eq!(biggest_magnitude(&nums), 3993);
+}
+
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
@@ -244,6 +278,7 @@ fn main() -> anyhow::Result<()> {
     let sum = nums.iter().cloned().reduce(|a, s| a + s).unwrap();
 
     println!("magnitude: {}", sum.magnitude());
+    println!("biggest magnitude: {}", biggest_magnitude(&nums));
 
     Ok(())
 }
