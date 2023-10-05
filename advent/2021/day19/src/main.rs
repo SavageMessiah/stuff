@@ -3,7 +3,8 @@ use std::{collections::HashSet, num::ParseIntError};
 use anyhow::anyhow;
 use itertools::Itertools;
 
-type Beacon = [i32; 3];
+type Coord = [i32; 3];
+type Beacon = Coord;
 type Matrix = [[i32; 3]; 3];
 type Scanner = HashSet<Beacon>;
 
@@ -54,31 +55,29 @@ static ROTATION: [Matrix; 4] = [ID,
                                  [0, 1, 0],
                                  [1, 0, 0]]];
 
-fn translate(dest: &Beacon, src: &Beacon, scanner: &Scanner) -> Scanner {
-    let deltas = [dest[0] - src[0],
-                  dest[1] - src[1],
-                  dest[2] - src[2]];
-
-    //println!("trying translating {:?} to {:?} with deltas {:?}", src, dest, deltas);
-
+fn translate(delta: &Coord, scanner: &Scanner) -> Scanner {
     scanner.iter().map(|b|
-                       [b[0] + deltas[0],
-                        b[1] + deltas[1],
-                        b[2] + deltas[2]]).collect()
+                       [b[0] + delta[0],
+                        b[1] + delta[1],
+                        b[2] + delta[2]]).collect()
 }
 
-fn merge(scanner: &mut Scanner, other: &Scanner) -> bool {
+fn merge(scanner: &mut Scanner, coords: &mut Vec<Coord>, other: &Scanner) -> bool {
     for (rot, face) in ROTATION.iter().cartesian_product(FACING) {
         //println!("trying rotation {:?} and facing {:?}", rot, face);
-        let rotated = other.iter().map(|b| transform(&transform(&b, &rot), &face)).collect();
+        let rotated = other.iter().map(|b| transform(&transform(&b, &rot), &face)).collect::<Scanner>();
 
         for dest in scanner.iter() {
             for src in &rotated {
-                let potential_fit = translate(dest, src, &rotated);
+                let coord = [dest[0] - src[0],
+                             dest[1] - src[1],
+                             dest[2] - src[2]];
+                let potential_fit = translate(&coord, &rotated);
                 let matches = scanner.intersection(&potential_fit).count();
                 //println!("attempted fit matches {}", matches);
                 if matches >= 12 {
                     println!("merging fit into scanner");
+                    coords.push(coord);
                     scanner.extend(potential_fit);
                     return true;
                 }
@@ -89,14 +88,19 @@ fn merge(scanner: &mut Scanner, other: &Scanner) -> bool {
     false
 }
 
-fn merge_all(scanners: &[Scanner]) -> Scanner {
+fn merge_all(scanners: &[Scanner]) -> (Scanner, Vec<[i32; 3]>) {
     let mut merged = scanners[0].clone();
+    let mut coords = vec![[0, 0, 0]];
     let mut remaining = scanners.iter().skip(1).collect::<Vec<_>>();
     while !remaining.is_empty() {
         println!("{} remaining to merge", remaining.len());
-        remaining = remaining.into_iter().filter(|scanner| !merge(&mut merged, scanner) ).collect();
+        remaining = remaining.into_iter().filter(|scanner| !merge(&mut merged, &mut coords, scanner) ).collect();
     }
-    merged
+    (merged, coords)
+}
+
+fn manhattan_distance(a: &Coord, b: &Coord) -> i32 {
+    (0..3).map(|i| (a[i] - b[i]).abs()).sum()
 }
 
 fn parse_input(input: &str) -> anyhow::Result<Vec<Scanner>> {
@@ -171,7 +175,7 @@ fn test_parse_and_merge() {
 807,-499,-711
 755,-354,-619
 553,889,-390").unwrap();
-    let merged = merge_all(&scanners);
+    let (merged, coords) = merge_all(&scanners);
 
     let expected = HashSet::from([
         [459,-707,401],
@@ -188,14 +192,17 @@ fn test_parse_and_merge() {
         [-635,-1737,486]]);
 
     assert_eq!(merged.intersection(&expected).count(), expected.len());
+    assert_eq!(coords, vec![[0, 0, 0], [68, -1246, -43]]);
 }
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let scanners = parse_input(&input)?;
-    let merged = merge_all(&scanners);
+    let (merged, coords) = merge_all(&scanners);
+    let max_dist = coords.iter().tuple_combinations().map(|(a, b)| manhattan_distance(a, b)).max().unwrap();
 
-    println!("{}", merged.len());
+    println!("# beacons {}", merged.len());
+    println!("max manhattan distance {}", max_dist);
 
     Ok(())
 }
