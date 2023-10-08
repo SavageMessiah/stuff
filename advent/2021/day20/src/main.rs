@@ -119,15 +119,15 @@ fn test_parse_and_run() {
 ..#..
 ..###").unwrap();
 
-    map = run(map, &algo, 2);
-    assert_eq!(map.values().filter(|v| **v).count(), 35);
+    map = run(map, &algo, 50);
+    assert_eq!(map.values().filter(|v| **v).count(), 3351);
 
 }
 
 fn main() -> anyhow::Result<()> {
     let input = std::fs::read_to_string("input.txt")?;
     let (algo, mut map) = parse_input(&input)?;
-    map = run(map, &algo, 2);
+    map = run(map, &algo, 50);
 
     println!("{:?}", algo);
     println!("# lit pixels {}", map.values().filter(|v| **v).count());
