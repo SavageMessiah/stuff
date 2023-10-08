@@ -1,67 +1,81 @@
+use std::{collections::HashMap, iter::repeat};
+
+use itertools::Itertools;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct Game {
     scores: [u32; 2],
     places: [u32; 2],
-    die: u32,
-    rolls: u32
+}
+
+enum Turn {
+    Game(Game),
+    Win(usize)
 }
 
 impl Game {
-    fn roll(&mut self) -> u32 {
-        self.rolls += 1;
-        let val = self.die;
-        self.die += 1;
-        if self.die > 100 {
-            self.die = 1;
+    fn start(starts: [u32; 2]) -> Game {
+        Game {
+            scores: [0, 0],
+            places: [starts[0] - 1, starts[1] - 1],
         }
-        val
     }
-    fn rolln(&mut self, n: usize) -> u32 {
-        let mut total = 0;
-        for _ in 0..n {
-            total += self.roll();
+
+    fn turn(&self, player: usize, roll: u32) -> Turn {
+        let mut succ = self.clone();
+        let place = &mut succ.places[player];
+        *place = (*place + roll) % 10;
+
+        let score = &mut succ.scores[player];
+        *score += *place + 1;
+        if *score >= 21 {
+            Turn::Win(player)
+        } else {
+            Turn::Game(succ)
         }
-        total
     }
-    fn step(&mut self, player: usize, n: u32) -> u32 {
-        let place = &mut self.places[player];
-        for _ in 0..n {
-            *place += 1;
-            if *place > 10 {
-                *place = 1;
+}
+
+fn play_all(starts: [u32; 2]) -> [u64; 2] {
+    let mut wins = [0, 0];
+    let mut universes = HashMap::from([(Game::start(starts), 1u64)]);
+    let mut player = 0;
+    while !universes.is_empty() {
+        let mut next_universes = HashMap::new();
+
+        for dice in repeat([1, 2, 3]).take(3).multi_cartesian_product() {
+            let roll = dice.iter().sum();
+            println!("roll: {:?} total: {}", dice, roll);
+
+            for (game, count) in &universes {
+                print!("{:?} {} results in", game, count);
+                match game.turn(player, roll) {
+                    Turn::Game(game) => {
+                        println!(" {:?}", game);
+                        *next_universes.entry(game).or_insert(0u64) += count
+                    },
+                    Turn::Win(player) => {
+                        println!(" {} wins", player);
+                        wins[player] += count
+                    }
+                }
             }
         }
-        *place
-    }
-    fn turn(&mut self, player: usize) -> bool {
-        let roll = self.rolln(3);
-        self.scores[player] += self.step(player, roll);
 
-        self.scores[player] >= 1000
+        player = (player + 1) % 2;
+        universes = next_universes;
     }
-    fn play(starts: [u32; 2]) -> u32 {
-        let mut game = Game {
-            scores: [0, 0],
-            places: starts,
-            die: 1,
-            rolls: 0
-        };
-        let mut player = 0;
-        while !game.turn(player) {
-            player = (player + 1) % 2;
-        }
-        println!("Player {} won with {}", player + 1, game.scores[player]);
-
-        game.scores[(player + 1) % 2] * game.rolls
-    }
+    wins
 }
 
 #[test]
 fn test_play() {
-    assert_eq!(Game::play([4,8]), 739785);
+    assert_eq!(play_all([4, 8]), [444356092776315, 341960390180808]);
 }
 
 
 fn main() {
-    let input = [10, 4];
-    println!("{}", Game::play(input));
+    let wins = play_all([10, 4]);
+
+    println!("{}", wins.iter().max().unwrap());
 }
