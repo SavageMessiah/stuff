@@ -1,0 +1,2 @@
+build:
+  clang -lX11 -lXi -lXcursor -lGL -ldl -lm -g -O0 main.c
