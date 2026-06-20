@@ -3,3 +3,7 @@ kusoge/c/snek/snek
 perf.data
 perf.data.old
 flamegraph.svg
+zig-pkg
+.zig-cache
+zig-out
+cuneiforth/docs.png
